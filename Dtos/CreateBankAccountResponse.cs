@@ -1,7 +1,7 @@
+namespace BankingApi.Dtos;
 
 
-
-public class BankAccountResponse
+public class CreateBankAccountResponse
 {
     public Guid Id { get; set; }
     public decimal Balance { get; set; }
