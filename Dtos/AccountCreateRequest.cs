@@ -1,6 +1,6 @@
 ﻿namespace BankingApi.Dtos;
 
-public class CreateAccountRequest
+public class AccountCreateRequest
 {
     public Guid OwnerGuid { get; set; }
 }

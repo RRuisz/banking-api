@@ -17,7 +17,7 @@ public class OwnersController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(CreateOwnerRequest request)
+    public async Task<IActionResult> Create(OwnerCreateRequest request)
     {
         var owner = new Owner(request.FirstName, request.LastName);
 

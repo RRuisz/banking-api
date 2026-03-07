@@ -1,6 +1,6 @@
 namespace BankingApi.Dtos;
 
-public class CreateOwnerRequest
+public class OwnerCreateRequest
 {
     public string FirstName { get; set; }
     public string LastName { get; set; }
