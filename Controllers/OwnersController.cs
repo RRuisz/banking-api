@@ -15,15 +15,5 @@ public class OwnersController : ControllerBase
     {
         _context = context;
     }
-
-    [HttpPost]
-    public async Task<IActionResult> Create(OwnerCreateRequest request)
-    {
-        var owner = new Owner(request.FirstName, request.LastName);
-
-        await _context.Owners.AddAsync(owner);
-        await _context.SaveChangesAsync();
-
-        return Ok(owner);
-    }
+    
 }

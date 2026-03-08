@@ -3,31 +3,33 @@ using Microsoft.AspNetCore.Mvc;
 using BankingApi.Dtos;
 using BankingApi.Services;
 using BankingApi.Exceptions;
+using Microsoft.AspNetCore.Authorization;
 
 [ApiController]
 [Route("api/bankaccounts")]
 public class AccountsController : ControllerBase
 {
     private readonly AccountService _service;
-
+    
     public AccountsController(AccountService service)
     {
         _service = service;
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] Guid ownerGuid)
+    [Authorize]
+    public async Task<IActionResult> GetAll()
     {
-        var accounts = await _service.GetAll(ownerGuid);
+        var accounts = await _service.GetAll();
         return Ok(accounts);
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(AccountCreateRequest request)
+    public async Task<IActionResult> Create()
     {
         try
         {
-            var response = await _service.Create(request);
+            var response = await _service.Create();
             return Ok(response);
         } catch (NotFoundException e)
         {
@@ -35,6 +37,7 @@ public class AccountsController : ControllerBase
         }
     }
 
+    [Authorize]
     [HttpPost("{accountId}/deposit")]
     public async Task<IActionResult> Deposit(Guid accountId, AccountDepositRequest request)
     {
@@ -51,6 +54,7 @@ public class AccountsController : ControllerBase
         }
     }
 
+    [Authorize]
     [HttpPost("{accountId}/withdraw")]
     public async Task<IActionResult> Withdraw(Guid accountId, AccountWithdrawRequest request)
     {
@@ -69,12 +73,13 @@ public class AccountsController : ControllerBase
         }
     }
 
+    [Authorize]
     [HttpGet("{accountId}/statement")]
-    public async Task<IActionResult> Statement(Guid accountId, [FromQuery] Guid ownerGuid)
+    public async Task<IActionResult> Statement(Guid accountId)
     {
         try
         {
-            var response = await _service.Statement(accountId, ownerGuid);
+            var response = await _service.Statement(accountId);
             return Ok(response);
         } catch (NotFoundException e)
         {
@@ -83,12 +88,13 @@ public class AccountsController : ControllerBase
 
     }
 
+    [Authorize]
     [HttpGet("{accountId}/balance")]
-    public async Task<IActionResult> GetBalance(Guid accountId, [FromQuery] Guid ownerGuid)
+    public async Task<IActionResult> GetBalance(Guid accountId)
     {
         try
         {
-            var response = await _service.GetBalance(accountId, ownerGuid);
+            var response = await _service.GetBalance(accountId);
             return Ok(response);
         } catch (NotFoundException e)
         {
@@ -97,6 +103,7 @@ public class AccountsController : ControllerBase
         
     }
 
+    [Authorize]
     [HttpPost("{accountId}/transfer")]
     public async Task<IActionResult> Transfer(Guid accountId, AccountTransferRequest request)
     {

@@ -9,13 +9,16 @@ using BankingApi.Exceptions;
 public class AccountService
 {
     private readonly AppDbContext _context;
+    private readonly ParseOwnerGuidService _ownerGuidService;
 
-    public AccountService(AppDbContext context){
+    public AccountService(AppDbContext context, ParseOwnerGuidService ownerGuidService){
         _context = context;
+        _ownerGuidService = ownerGuidService;
     }
 
-    public async Task<List<BankAccount>> GetAll(Guid ownerGuid)
+    public async Task<List<BankAccount>> GetAll()
     {
+        var ownerGuid = _ownerGuidService.GetUserId();
         var accounts = await _context.BankAccounts
             .Where(a => a.OwnerId == ownerGuid)
             .ToListAsync();
@@ -23,15 +26,16 @@ public class AccountService
         return accounts;
     }
 
-    public async Task<AccountCreateResponse> Create(AccountCreateRequest request)
+    public async Task<AccountCreateResponse> Create()
     {
-        var owner = await _context.Owners.FindAsync(request.OwnerGuid);
+        var ownerGuid = _ownerGuidService.GetUserId();
+        var owner = await _context.Owners.FindAsync(ownerGuid);
         if (owner == null)
         {
             throw new NotFoundException("Owner not found");
         }
 
-        var account = new BankAccount(request.OwnerGuid);
+        var account = new BankAccount(ownerGuid);
 
         await _context.BankAccounts.AddAsync(account);
         await _context.SaveChangesAsync();
@@ -50,8 +54,8 @@ public class AccountService
         {
             throw new BadRequestException("Please enter a valid Amount!");
         }
-
-        var account = await _context.BankAccounts.FirstOrDefaultAsync(a => a.Id == accountId && a.OwnerId == request.OwnerGuid);
+        var ownerGuid = _ownerGuidService.GetUserId();
+        var account = await _context.BankAccounts.FirstOrDefaultAsync(a => a.Id == accountId && a.OwnerId == ownerGuid);
 
         if (account == null)
         {
@@ -77,8 +81,8 @@ public class AccountService
         {
             throw new BadRequestException("Please enter a valid Amount");
         }
-
-        var account = await _context.BankAccounts.FirstOrDefaultAsync(a => a.Id == accountId && a.OwnerId == request.OwnerGuid);
+        var ownerGuid = _ownerGuidService.GetUserId();
+        var account = await _context.BankAccounts.FirstOrDefaultAsync(a => a.Id == accountId && a.OwnerId == ownerGuid);
         if (account == null)
         {
             throw new NotFoundException("BankAccount not found!");
@@ -103,8 +107,9 @@ public class AccountService
         };
     }
 
-    public async Task<AccountStatementResponse> Statement(Guid accountId, Guid ownerGuid)
+    public async Task<AccountStatementResponse> Statement(Guid accountId)
     {
+        var ownerGuid = _ownerGuidService.GetUserId();
         var account = await _context.BankAccounts
         .Include(a => a.Transactions)
         .FirstOrDefaultAsync(a => a.Id == accountId && a.OwnerId == ownerGuid);
@@ -133,8 +138,9 @@ public class AccountService
 
     }
 
-    public async Task<AccountGetBalanceResponse> GetBalance(Guid accountId, Guid ownerGuid)
+    public async Task<AccountGetBalanceResponse> GetBalance(Guid accountId)
     {
+        var ownerGuid = _ownerGuidService.GetUserId();
         var account = await _context.BankAccounts.FirstOrDefaultAsync(a => a.Id == accountId && a.OwnerId == ownerGuid);
 
         if (account == null)
@@ -152,7 +158,8 @@ public class AccountService
 
     public async Task<AccountTransferResponse> Transfer(Guid accountId, AccountTransferRequest request)
     {
-        var account = await _context.BankAccounts.FirstOrDefaultAsync(a => a.Id == accountId && a.OwnerId == request.OwnerGuid);
+        var ownerGuid = _ownerGuidService.GetUserId();
+        var account = await _context.BankAccounts.FirstOrDefaultAsync(a => a.Id == accountId && a.OwnerId == ownerGuid);
 
         if (account == null)
         {
