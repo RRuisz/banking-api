@@ -24,103 +24,57 @@ public class AccountsController : ControllerBase
         return Ok(accounts);
     }
 
+    [Authorize]
     [HttpPost]
     public async Task<IActionResult> Create()
     {
-        try
-        {
-            var response = await _service.Create();
-            return Ok(response);
-        } catch (NotFoundException e)
-        {
-            return NotFound(new { message = e.Message });
-        }
+        var response = await _service.Create();
+        return Ok(response);
     }
 
     [Authorize]
     [HttpPost("{accountId}/deposit")]
     public async Task<IActionResult> Deposit(Guid accountId, AccountDepositRequest request)
     {
-        try
-        {
-            var response = await _service.Deposit(accountId, request);
-            return Ok(response);
-        } catch(NotFoundException e)
-        {
-            return NotFound(new { message = e.Message });
-        } catch(BadRequestException e)
-        {
-            return BadRequest(new { message = e.Message });
-        }
+        var response = await _service.Deposit(accountId, request);
+        return Ok(response);
     }
 
     [Authorize]
     [HttpPost("{accountId}/withdraw")]
     public async Task<IActionResult> Withdraw(Guid accountId, AccountWithdrawRequest request)
-    {
-        try
-        {
-            var response = await _service.Withdraw(accountId, request);
-            return Ok(response);
-        }
-        catch (NotFoundException e)
-        {
-            return NotFound(new { message = e.Message });
-        }
-        catch (BadRequestException e)
-        {
-            return BadRequest(new { message = e.Message });
-        }
+    { 
+        var response = await _service.Withdraw(accountId, request);
+        return Ok(response);
     }
 
     [Authorize]
     [HttpGet("{accountId}/statement")]
-    public async Task<IActionResult> Statement(Guid accountId)
+    public async Task<IActionResult> Statement(
+        Guid accountId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        try
-        {
-            var response = await _service.Statement(accountId);
-            return Ok(response);
-        } catch (NotFoundException e)
-        {
-            return NotFound(new { message = e.Message });
-        }
-
+        var response = await _service.Statement(accountId, page, pageSize);
+        return Ok(response);
     }
 
     [Authorize]
     [HttpGet("{accountId}/balance")]
     public async Task<IActionResult> GetBalance(Guid accountId)
     {
-        try
-        {
-            var response = await _service.GetBalance(accountId);
-            return Ok(response);
-        } catch (NotFoundException e)
-        {
-            return NotFound(new { message = e.Message });
-        }
-        
+        var response = await _service.GetBalance(accountId);
+
+        return Ok(response);
     }
 
     [Authorize]
     [HttpPost("{accountId}/transfer")]
     public async Task<IActionResult> Transfer(Guid accountId, AccountTransferRequest request)
     {
-
-        try
-        {
-            var response = await _service.Transfer(accountId, request);
-            return Ok(response);
-        }
-        catch (NotFoundException e)
-        {
-            return NotFound(new { message = e.Message });
-        }
-        catch (BadRequestException e)
-        {
-            return BadRequest(new { message = e.Message });
-        }
+        var response = await _service.Transfer(accountId, request);
+        
+        return Ok(response);
     }
     
 }

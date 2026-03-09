@@ -6,6 +6,7 @@ public class BankAccount
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public decimal Balance { get; private set; }
+    public decimal ReservedBalance { get; private set; } = 0;
 
     public Guid OwnerId { get; set; }
     public Owner Owner { get; set; } = null!;
@@ -21,42 +22,41 @@ public class BankAccount
 
     public void Deposit(decimal amount)
     {
-        decimal oldBalance = Balance;
         Balance += amount;
-        CreateTransaction(amount, TransactionType.Deposit, oldBalance);
     }
 
     public void Withdraw(decimal amount)
     {
-        decimal oldBalance = Balance;
         Balance -= amount;
-        CreateTransaction(amount, TransactionType.Withdraw, oldBalance);
     }
 
-    public void Transfer(decimal amount, BankAccount targetAccount)
+    public decimal CalcFee(decimal amount)
     {
-        TransferSend(amount);
-        targetAccount.TransferReceive(amount);
+        return Math.Round(amount * 0.02m, 2);
     }
 
-    private void TransferSend(decimal amount)
+    public decimal CalcNewBalance(decimal amount, decimal fee)
     {
-        var oldBalance = Balance;
+        return Balance - (amount + fee);
+    }
+
+    public void TransferSend(decimal amount)
+    {
         Balance -= amount;
-
-        CreateTransaction(amount, TransactionType.TransferSend, oldBalance);
     }
 
-    private void TransferReceive(decimal amount)
+    public void TransferReceive(decimal amount)
     {
-        var oldBalance = Balance;
         Balance += amount;
-
-        CreateTransaction(amount, TransactionType.TransferReceive, oldBalance);
     }
 
-    private void CreateTransaction(decimal amount, TransactionType type, decimal oldBalance)
+    public void Reserve(decimal amount)
     {
-        Transactions.Add(new Transaction(amount, this, type, oldBalance, Balance));
+        ReservedBalance += amount;
+    }
+    
+    public void Unreserve(decimal amount)
+    {
+        ReservedBalance -= amount;
     }
 }

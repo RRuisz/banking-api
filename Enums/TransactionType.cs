@@ -4,6 +4,7 @@ public enum TransactionType
 {
     Deposit,
     Withdraw,
-    TransferSend,
+    InstantTransferSend,
+    ScheduledTransferSend,
     TransferReceive
 }
