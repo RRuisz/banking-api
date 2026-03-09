@@ -24,6 +24,7 @@ public class AccountsController : ControllerBase
         return Ok(accounts);
     }
 
+    [Authorize]
     [HttpPost]
     public async Task<IActionResult> Create()
     {

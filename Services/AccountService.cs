@@ -5,6 +5,8 @@ using BankingApi.Dtos;
 using BankingApi.Data;
 using Microsoft.EntityFrameworkCore;
 using BankingApi.Exceptions;
+using BankingApi.Enums;
+using Hangfire;
 
 public class AccountService
 {
@@ -64,6 +66,8 @@ public class AccountService
 
         decimal oldBalance = account.Balance;
         account.Deposit(request.Amount);
+        var transaction = Transaction.CreateTransaction(request.Amount, null, account, null, TransactionType.Deposit, oldBalance, account.Balance, TransactionStatus.Processed);
+        account.Transactions.Add(transaction);
         await _context.SaveChangesAsync();
 
         return new AccountDepositResponse
@@ -88,13 +92,15 @@ public class AccountService
             throw new NotFoundException("BankAccount not found!");
         }
 
-        if (account.Balance < request.Amount)
+        if ((account.Balance - account.ReservedBalance) < request.Amount)
         {
             throw new BadRequestException("Not enough Balance!");
         }
 
         decimal oldBalance = account.Balance;
         account.Withdraw(request.Amount);
+        var transaction = Transaction.CreateTransaction(request.Amount, null, account, null, TransactionType.Withdraw, oldBalance, account.Balance, TransactionStatus.Processed);
+        account.Transactions.Add(transaction);
         await _context.SaveChangesAsync();
 
         return new AccountWithdrawResponse
@@ -158,34 +164,111 @@ public class AccountService
 
     public async Task<AccountTransferResponse> Transfer(Guid accountId, AccountTransferRequest request)
     {
+        if (request.Amount <= 0)
+            throw new BadRequestException("Please enter a valid Amount");
+
         var ownerGuid = _ownerGuidService.GetUserId();
         var account = await _context.BankAccounts.FirstOrDefaultAsync(a => a.Id == accountId && a.OwnerId == ownerGuid);
 
         if (account == null)
-        {
             throw new NotFoundException("Account for your User not found!");
-        }
 
-        if (account.Balance < request.Amount)
-        {
+        if ((account.Balance - account.ReservedBalance) < request.Amount)
             throw new BadRequestException("Not enought Balance on your Account!");
-        }
+        
 
         var targetAccount = await _context.BankAccounts.SingleOrDefaultAsync(a => a.Id == request.TargetAccountGuid);
-        if (targetAccount == null)
-        {
-            throw new NotFoundException("Target Account not Found!");
-        }
 
-        account.Transfer(request.Amount, targetAccount);
-        await _context.SaveChangesAsync();
+        if (targetAccount == null)
+            throw new NotFoundException("Target Account not Found!");
+
+        if (!request.InstantTransfer)
+            return await CreateScheduledTransfer(request.Amount, account, targetAccount);
+
+        return await CreateInstantTransfer(request.Amount, account, targetAccount);
+    }
+
+    private async Task<AccountTransferResponse> CreateScheduledTransfer(decimal amount, BankAccount account, BankAccount targetAccount)
+    {
+        var sourceNewBalance = account.Balance - amount;
+        var sourceTransaction = Transaction
+            .CreateTransaction(amount, 0m, account, targetAccount, TransactionType.ScheduledTransferSend, account.Balance, sourceNewBalance, TransactionStatus.Pending);
+
+        var targetNewBalance = targetAccount.Balance + amount;
+        var targetTransaction = Transaction
+           .CreateTransaction(amount, 0m, targetAccount, account, TransactionType.TransferReceive, targetAccount.Balance, targetNewBalance, TransactionStatus.Pending);
         
+        account.Transactions.Add(sourceTransaction);
+        account.Reserve(amount);
+
+        targetAccount.Transactions.Add(targetTransaction);
+        await _context.SaveChangesAsync();
+
+        BackgroundJob.Schedule<AccountService>(
+            x => x.ExecuteScheduledTransfer(sourceTransaction.Id, targetTransaction.Id),
+            TimeSpan.FromMinutes(5));
+
+        return new AccountTransferResponse
+        {
+            AccountId = account.Id,
+            Amount = sourceTransaction.Amount,
+            NewBalance = sourceTransaction.NewBalance,
+            TargetAccountId = sourceTransaction.TargetAccount.Id,
+            Status = sourceTransaction.Status
+        };
+    }
+
+    private async Task<AccountTransferResponse> CreateInstantTransfer(decimal amount, BankAccount account, BankAccount targetAccount)
+    {
+        var fee = account.CalcFee(amount);
+        var newBalance = account.CalcNewBalance(amount, fee);
+        var instantTransaction = Transaction
+            .CreateTransaction(amount, fee, account, targetAccount, TransactionType.InstantTransferSend, account.Balance, newBalance, TransactionStatus.Processed);
+        account.Transactions.Add(instantTransaction);
+
+        var targetNewBalance = targetAccount.Balance + amount;
+        var targetTransaction = Transaction
+            .CreateTransaction(amount, 0, targetAccount, account, TransactionType.TransferReceive, targetAccount.Balance, targetNewBalance, TransactionStatus.Processed);
+        targetAccount.Transactions.Add(targetTransaction);
+
+        account.TransferSend(amount + fee);
+        targetAccount.TransferReceive(amount);
+        await _context.SaveChangesAsync();
+
         return new AccountTransferResponse
         {
             AccountId = account.Id,
             TargetAccountId = targetAccount.Id,
-            Amount = request.Amount,
-            NewBalance = account.Balance,
+            Amount = instantTransaction.Amount + (instantTransaction.Fee ?? 0m),
+            NewBalance = instantTransaction.NewBalance,
+            Status = instantTransaction.Status
         };
+    }
+
+    public async Task ExecuteScheduledTransfer(Guid sourceTransactionGuid, Guid targetTransactionGuid)
+    {
+        var sourceTransaction = await _context.Transactions
+            .Include(t => t.Account)
+            .Include(t => t.TargetAccount)
+            .FirstOrDefaultAsync(t => t.Id == sourceTransactionGuid);
+
+        var targetTransaction = await _context.Transactions
+            .Include(t => t.Account)
+            .FirstOrDefaultAsync(t => t.Id == targetTransactionGuid);
+
+        if (sourceTransaction == null)
+            throw new NotFoundException("Source transaction not found");
+
+        if (targetTransaction == null)
+            throw new NotFoundException("Target transaction not found");
+
+        sourceTransaction.Account.TransferSend(sourceTransaction.Amount);
+        sourceTransaction.Account.Unreserve(sourceTransaction.Amount);
+        sourceTransaction.TargetAccount.TransferReceive(targetTransaction.Amount);
+
+        sourceTransaction.Status = TransactionStatus.Processed;
+        targetTransaction.Status = TransactionStatus.Processed;
+
+        await _context.SaveChangesAsync();
     }
 }
