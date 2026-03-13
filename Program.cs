@@ -5,6 +5,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using BankingApi.Services;
+using System.Text.Json.Serialization;
+using Hangfire;
+using Hangfire.PostgreSql;
+using BankingApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 var jwtKey = builder.Configuration["Jwt:Key"]!;
@@ -22,6 +26,7 @@ builder.Services.AddCors(options =>
 });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHangfireServer();
 builder.Services.AddDbContext<AppDbContext>(options =>
 options.UseNpgsql(connectionString));
 builder.Services.AddAuthentication(options =>
